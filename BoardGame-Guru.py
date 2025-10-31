@@ -40,16 +40,24 @@ st.markdown(
     }
 
     
-/* User Chat Input field (at the bottom) - FINAL FIX */
-div[data-testid="stChatInput"] input {
-    background-color: #3F00DE !important; 
-    color: white !important; 
+/* Chat input box */
+div[data-testid="stChatInputContainer"] {
+    background-color: #3F00DE !important; /* your preferred color */
+    border-radius: 10px !important;
+    padding: 8px !important;
 }
 
-/* Placeholder fix */
-div[data-testid="stChatInput"] input::placeholder {
-    color: #FFB703 !important;
-    opacity: 1 !important;
+/* Chat input text area */
+div[data-testid="stChatInputContainer"] textarea {
+    background-color: #3F00DE !important;
+    color: white !important;
+    font-size: 16px !important;
+    border-radius: 10px !important;
+}
+
+/* Chat input placeholder */
+div[data-testid="stChatInputContainer"] textarea::placeholder {
+    color: #D8D8D8 !important;
 }
 
 
