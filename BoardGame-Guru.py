@@ -39,6 +39,18 @@ st.markdown(
         color: white !important; 
     }
 
+
+    /* Chat input background and text color */
+    div[data-testid="stChatMessageInput"] textarea {
+        background-color: #531DB3 !important;
+        color: #FAFAFA !important;
+    }
+    /* Optional: placeholder text color */
+    div[data-testid="stChatMessageInput"] textarea::placeholder {
+        color: #AAAAAA !important;
+    }
+
+    
     
     /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
