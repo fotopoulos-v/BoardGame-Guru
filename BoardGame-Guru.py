@@ -75,7 +75,7 @@ st.markdown(
 
     /* Reset Chat button (sidebar) */
     section[data-testid="stSidebar"] div.stButton > button {
-        background-color: #D62F2F !important; color: #FAFAFA !important;
+        background-color: #D13B3B !important; color: #FAFAFA !important;
         border-radius: 8px !important; border: 2px solid #8B0000 !important;
         font-weight: bold !important; font-size: 16px !important; width: 160px !important; height: 42px !important;
         margin-top: 10px !important; transition: all 0.2s ease-in-out !important;
@@ -86,7 +86,7 @@ st.markdown(
 
     /* Process PDFs button (main) */
     div[data-testid="stButton"] > button {
-        background-color: #358239 !important; color: white !important; 
+        background-color: #569958 !important; color: white !important; 
         border-radius: 8px !important; height: 42px !important; width: 160px !important;
         font-weight: bold !important; font-size: 16px !important; border: 2px solid #2E7D32 !important;
         transition: all 0.2s ease-in-out !important;
