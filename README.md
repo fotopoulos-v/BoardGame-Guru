@@ -6,7 +6,7 @@
 
 
 **Your AI rules master!**  
-Upload your board game rulebooks and ask questions in plain English — BoardGame Guru reads your PDFs and explains the rules so you can focus on playing.  
+Upload your board game rulebooks and ask questions in plain English - BoardGame Guru reads your PDFs and explains the rules so you can focus on playing.  
 
 🧠 Powered by advanced language models and embeddings for fast, accurate answers.
 
@@ -34,10 +34,13 @@ If you enjoy it, consider showing your support - it helps keep the Guru online a
 
 ## 🧩 How It Works
 
-BoardGame Guru is built on a **RAG (Retrieval-Augmented Generation)** architecture -
-a technique that uses retrieved information from your uploaded PDFs to augment the prompt of a large language model before generating an answer.
+<p align="justify">
+BoardGame Guru is built on a <b>RAG (Retrieval-Augmented Generation)</b> architecture —
+a technique that uses retrieved information from your uploaded PDFs to augment the prompt
+of a large language model before generating an answer.
 
 Here’s what happens behind the scenes:
+</p>
 1. **Upload** one or more PDF rulebooks.  
 2. **BoardGame Guru** extracts text and splits it into chunks.  
 3. Each chunk is **embedded** using the `all-MiniLM-L6-v2` model.  
