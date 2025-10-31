@@ -203,7 +203,7 @@ with st.sidebar:
             transition: all 0.3s ease;
         }
         .bmc-button:hover {
-            background-color:#000CFF;
+            background-color:#003AAB;
             transform: scale(1.05);
         }
         </style>
