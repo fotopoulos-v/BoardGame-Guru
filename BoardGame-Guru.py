@@ -261,151 +261,66 @@ if not uploaded_files:
     st.info("Please upload one or more PDF rulebooks to continue.")
     st.stop()
 
-# # ---------------------------
-# # Process PDFs button
-# # ---------------------------
-# if st.button("⚙️ Process PDFs"):
-#     current_files = [f.name for f in uploaded_files]
-#     if current_files != st.session_state.last_uploaded_files:
-#         st.session_state.messages = []
-#         st.cache_data.clear()
-#         st.cache_resource.clear()
-#         st.session_state.last_uploaded_files = current_files
-#         st.toast("🔄 New PDF(s) detected — cache and chat history cleared.", icon="🔁")
-
-#     @st.cache_data
-#     def extract_pdf_texts(file_data):
-#         pdf_texts = []
-#         for file_name, file_content in file_data:
-#             reader = PdfReader(BytesIO(file_content))
-#             text = "\n".join(page.extract_text() or "" for page in reader.pages)
-#             pdf_texts.append((file_name, text))
-#         return pdf_texts
-
-#     file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
-#     pdf_texts = extract_pdf_texts(file_data)
-
-#     def chunk_text(text, chunk_size=1200, overlap=200):
-#         chunks = []
-#         start = 0
-#         while start < len(text):
-#             end = min(start + chunk_size, len(text))
-#             chunks.append(text[start:end])
-#             start += chunk_size - overlap
-#         return chunks
-
-#     all_chunks = []
-#     for name, text in pdf_texts:
-#         chunks = chunk_text(text)
-#         all_chunks.extend(chunks)
-
-#     @st.cache_resource
-#     def build_faiss_index(chunks):
-#         model = SentenceTransformer("all-MiniLM-L6-v2")
-#         embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
-#         index = faiss.IndexFlatL2(embeddings.shape[1])
-#         index.add(embeddings)
-#         return index, model, embeddings
-
-#     index, model, embeddings = build_faiss_index(all_chunks)
-
-#     st.session_state.index = index
-#     st.session_state.model = model
-#     st.session_state.embeddings = embeddings
-#     st.session_state.all_chunks = all_chunks
-#     st.session_state.pdfs_processed = True
-#     st.session_state.index_ready = True
-
-#     # ✅ Store messages only (don't display yet)
-#     st.session_state.pdf_messages = [
-#         f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
-#         f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
-#     ]
-
-
 # ---------------------------
 # Process PDFs button
 # ---------------------------
 if st.button("⚙️ Process PDFs"):
-    
-    # 1. Start the status container in the main body
-    # It appears right below the button, separate from the floating corner widgets.
-    with st.status("Initializing PDF processing...", expanded=True) as status:
-        
-        # --- Check for new files ---
-        current_files = [f.name for f in uploaded_files]
-        if current_files != st.session_state.last_uploaded_files:
-            # We keep st.toast here, as it's a transient message you want to pop up.
-            st.toast("🔄 New PDF(s) detected — cache and chat history cleared.", icon="🔁")
-            
-            st.session_state.messages = []
-            st.cache_data.clear()
-            st.cache_resource.clear()
-            st.session_state.last_uploaded_files = current_files
+    current_files = [f.name for f in uploaded_files]
+    if current_files != st.session_state.last_uploaded_files:
+        st.session_state.messages = []
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.session_state.last_uploaded_files = current_files
+        # st.toast("🔄 New PDF(s) detected — cache and chat history cleared.", icon="🔁")
 
-        # --- Update status and proceed with Extraction ---
-        status.update(label="Extracting text from PDFs...", state="running", expanded=True)
+    @st.cache_data
+    def extract_pdf_texts(file_data):
+        pdf_texts = []
+        for file_name, file_content in file_data:
+            reader = PdfReader(BytesIO(file_content))
+            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+            pdf_texts.append((file_name, text))
+        return pdf_texts
 
-        @st.cache_data
-        def extract_pdf_texts(file_data):
-            pdf_texts = []
-            for file_name, file_content in file_data:
-                reader = PdfReader(BytesIO(file_content))
-                text = "\n".join(page.extract_text() or "" for page in reader.pages)
-                pdf_texts.append((file_name, text))
-            return pdf_texts
+    file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
+    pdf_texts = extract_pdf_texts(file_data)
 
-        file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
-        pdf_texts = extract_pdf_texts(file_data)
+    def chunk_text(text, chunk_size=1200, overlap=200):
+        chunks = []
+        start = 0
+        while start < len(text):
+            end = min(start + chunk_size, len(text))
+            chunks.append(text[start:end])
+            start += chunk_size - overlap
+        return chunks
 
-        # --- Update status and proceed with Chunking ---
-        status.update(label=f"Chunking {len(pdf_texts)} PDF(s) into text snippets...", state="running", expanded=True)
+    all_chunks = []
+    for name, text in pdf_texts:
+        chunks = chunk_text(text)
+        all_chunks.extend(chunks)
 
-        def chunk_text(text, chunk_size=1200, overlap=200):
-            chunks = []
-            start = 0
-            while start < len(text):
-                end = min(start + chunk_size, len(text))
-                chunks.append(text[start:end])
-                start += chunk_size - overlap
-            return chunks
+    @st.cache_resource
+    def build_faiss_index(chunks):
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
+        index = faiss.IndexFlatL2(embeddings.shape[1])
+        index.add(embeddings)
+        return index, model, embeddings
 
-        all_chunks = []
-        for name, text in pdf_texts:
-            chunks = chunk_text(text)
-            all_chunks.extend(chunks)
+    index, model, embeddings = build_faiss_index(all_chunks)
 
-        # --- Update status and proceed with Indexing ---
-        # ⚠️ This step (SentenceTransformer and FAISS) usually generates the "Running (building faiss)"
-        # floating notification. By wrapping it in st.status(), we contain the message.
-        status.update(label=f"Building FAISS vector index from {len(all_chunks)} chunks...", state="running", expanded=True)
+    st.session_state.index = index
+    st.session_state.model = model
+    st.session_state.embeddings = embeddings
+    st.session_state.all_chunks = all_chunks
+    st.session_state.pdfs_processed = True
+    st.session_state.index_ready = True
 
-        @st.cache_resource
-        def build_faiss_index(chunks):
-            model = SentenceTransformer("all-MiniLM-L6-v2")
-            embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
-            index = faiss.IndexFlatL2(embeddings.shape[1])
-            index.add(embeddings)
-            return index, model, embeddings
-
-        index, model, embeddings = build_faiss_index(all_chunks)
-
-        # --- Finalize State ---
-        st.session_state.index = index
-        st.session_state.model = model
-        st.session_state.embeddings = embeddings
-        st.session_state.all_chunks = all_chunks
-        st.session_state.pdfs_processed = True
-        st.session_state.index_ready = True
-        
-        # Store final success message
-        st.session_state.pdf_messages = [
-            f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
-            f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
-        ]
-
-        # 2. Complete the status widget with a final message
-        status.update(label="✅ Rulebooks processed and Guru is ready to chat!", state="complete", expanded=False)
+    # ✅ Store messages only (don't display yet)
+    st.session_state.pdf_messages = [
+        f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
+        f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
+    ]
 
 
 # ---------------------------
