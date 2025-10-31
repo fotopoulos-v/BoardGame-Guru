@@ -39,6 +39,15 @@ st.markdown(
         color: white !important; 
     }
 
+    
+    /* User Chat Input field (at the bottom) */
+    div[data-testid="stChatInput"] input {
+        background-color: #4C00E0 !important; /* Example: A new color for the chat box */
+        color: white !important;             /* Keep text color readable */
+    }
+
+
+
     /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
         background-color: #E3B646 !important;
