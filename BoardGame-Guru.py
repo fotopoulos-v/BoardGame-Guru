@@ -40,10 +40,16 @@ st.markdown(
     }
 
     
-    /* User Chat Input field (at the bottom) */
-    div[data-testid="stChatInput"] input {
-        background-color: #4C00E0 !important; /* Example: A new color for the chat box */
-        color: white !important;             /* Keep text color readable */
+    /* User Chat Input field (at the bottom) - FINAL ATTEMPT */
+    div[data-testid="stChatInput"] > div > div > input {
+        background-color: #3F00DE !important; 
+        color: white !important; 
+    }
+
+    /* Optional: To ensure the hover/focus effect doesn't change it back */
+    div[data-testid="stChatInput"] input:focus {
+        background-color: #3F00DE !important; 
+        color: white !important;
     }
 
 
