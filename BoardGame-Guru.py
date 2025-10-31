@@ -49,8 +49,8 @@ st.markdown(
 
     /* 2. Target the placeholder text color inside the <textarea> */
     textarea::placeholder {
-        color: #BFB48E !important; /* Bright color for visibility */
-        opacity: 1 !important;      /* Ensure full opacity */
+        color: #9F8DB0 !important; /* Bright color for visibility */
+        opacity: 0.8 !important;      /* Ensure full opacity */
     }
 
     
