@@ -40,16 +40,22 @@ st.markdown(
     }
 
     
-    /* User Chat Input field (at the bottom) - FINAL ATTEMPT */
+    /* 1. Target the actual input field (background and live text color) */
     div[data-testid="stChatInput"] > div > div > input {
         background-color: #3F00DE !important; 
         color: white !important; 
     }
 
-    /* Optional: To ensure the hover/focus effect doesn't change it back */
-    div[data-testid="stChatInput"] input:focus {
+    /* 2. Target the containing div (important for some themes/browsers) */
+    div[data-testid="stChatInput"] {
         background-color: #3F00DE !important; 
-        color: white !important;
+        border-radius: 0.5rem; /* Optional: adds a slight border radius to the container */
+    }
+
+    /* 3. Target the placeholder text color */
+    div[data-testid="stChatInput"] input::placeholder {
+        color: #FFB703 !important; /* Use a bright color (like your sidebar color) for placeholder visibility */
+        opacity: 1 !important; /* Ensures the placeholder is fully visible */
     }
 
 
