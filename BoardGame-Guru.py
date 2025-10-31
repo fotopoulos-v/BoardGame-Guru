@@ -39,15 +39,21 @@ st.markdown(
         color: white !important; 
     }
 
-
-    /* Chat input background and text color */
-    div[data-testid="stChatMessageInput"] textarea {
-        background-color: #531DB3 !important;
-        color: #FAFAFA !important;
+    /* 1. Target the actual editable DIV (background and live text color) */
+    div[data-testid="stChatInput"] [data-baseweb="textarea"] {
+        background-color: #531DB3 !important; 
+        color: white !important; 
     }
-    /* Optional: placeholder text color */
-    div[data-testid="stChatMessageInput"] textarea::placeholder {
-        color: #AAAAAA !important;
+
+    /* 2. Target the placeholder text color */
+    /* Note: The placeholder might be another div or element; this is the most common selector for the 'hint' text */
+    div[data-testid="stChatInput"] > div > div > div:nth-child(2) {
+        color: #FFB703 !important;
+    }
+
+    /* 3. Target the surrounding container to ensure total coverage */
+    .stChatInputContainer {
+        background-color: #531DB3 !important;
     }
 
     
