@@ -1,4 +1,9 @@
-# <img src="assets/images/guru_logo.png" alt="BoardGame Guru Logo" width="100"/> BoardGame Guru
+<p align="center">
+  <img src="assets/images/guru_logo.png" alt="BoardGame Guru Logo" width="110"/>
+</p>
+
+<h1 align="center">BoardGame Guru</h1>
+
 
 **Your AI rules master!**  
 Upload your board game rulebooks and ask questions in plain English — BoardGame Guru reads your PDFs and explains the rules so you can focus on playing.  
