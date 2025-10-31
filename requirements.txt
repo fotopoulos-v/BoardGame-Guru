@@ -4,4 +4,4 @@ faiss-cpu==1.12.0
 sentence-transformers==2.2.2
 huggingface_hub==0.17.1
 numpy>=1.26.4,<2
-transformers
+transformers==4.39.3
