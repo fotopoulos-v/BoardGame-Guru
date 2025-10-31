@@ -40,28 +40,6 @@ st.markdown(
     }
 
     
-/* Chat input box */
-div[data-testid="stChatInputContainer"] {
-    background-color: #3F00DE !important; /* your preferred color */
-    border-radius: 10px !important;
-    padding: 8px !important;
-}
-
-/* Chat input text area */
-div[data-testid="stChatInputContainer"] textarea {
-    background-color: #3F00DE !important;
-    color: white !important;
-    font-size: 16px !important;
-    border-radius: 10px !important;
-}
-
-/* Chat input placeholder */
-div[data-testid="stChatInputContainer"] textarea::placeholder {
-    color: #D8D8D8 !important;
-}
-
-
-
     /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
         background-color: #E3B646 !important;
