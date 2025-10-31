@@ -39,24 +39,36 @@ st.markdown(
         color: white !important; 
     }
 
-    /* 1. Target the actual editable DIV (background and live text color) */
-    div[data-testid="stChatInput"] [data-baseweb="textarea"] {
+    # /* 1. Target the actual editable DIV (background and live text color) */
+    # div[data-testid="stChatInput"] [data-baseweb="textarea"] {
+    #     background-color: #531DB3 !important; 
+    #     color: white !important; 
+    # }
+
+    # /* 2. Target the placeholder text color */
+    # /* Note: The placeholder might be another div or element; this is the most common selector for the 'hint' text */
+    # div[data-testid="stChatInput"] > div > div > div:nth-child(2) {
+    #     color: #FFB703 !important;
+    # }
+
+    # /* 3. Target the surrounding container to ensure total coverage */
+    # .stChatInputContainer {
+    #     background-color: #531DB3 !important;
+    # }
+
+    
+    /* 1. Target the actual <textarea> element (background and live text color) */
+    textarea {
         background-color: #531DB3 !important; 
         color: white !important; 
     }
 
-    /* 2. Target the placeholder text color */
-    /* Note: The placeholder might be another div or element; this is the most common selector for the 'hint' text */
-    div[data-testid="stChatInput"] > div > div > div:nth-child(2) {
-        color: #FFB703 !important;
+    /* 2. Target the placeholder text color inside the <textarea> */
+    textarea::placeholder {
+        color: #FFC226 !important; /* Bright color for visibility */
+        opacity: 1 !important;      /* Ensure full opacity */
     }
 
-    /* 3. Target the surrounding container to ensure total coverage */
-    .stChatInputContainer {
-        background-color: #531DB3 !important;
-    }
-
-    
     
     /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
