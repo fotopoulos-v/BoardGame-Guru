@@ -191,7 +191,7 @@ with st.sidebar:
         """
         <style>
         .bmc-button {
-            background-color:#176396;
+            background-color:#3679AD;
             color:white;
             border:none;
             border-radius:8px;
