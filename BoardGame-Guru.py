@@ -8,6 +8,22 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+
+# ---------------------------
+# Settings
+# ---------------------------
+st.set_page_config(
+    page_title="BoardGame Guru",
+    page_icon="assets/images/guru_logo.png",  
+    layout="centered"
+)
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+
+
+
+
 # ---------------------------
 # Custom CSS for styling
 # ---------------------------
@@ -68,16 +84,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------------------------
-# Settings
-# ---------------------------
-st.set_page_config(
-    page_title="BoardGame Guru",
-    page_icon="assets/images/guru_logo.png",  
-    layout="centered"
-)
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------------------
 # Session state defaults
