@@ -34,7 +34,10 @@ st.markdown(
     section[data-testid="stSidebar"] { background-color: #2D1940; color: #FFB703; }
 
     /* Board Game Name input */
-    div[data-testid="stTextInput"] input { background-color: #3F00DE !important; color: white !important;  }
+    div[data-testid="stTextInput"] > div > input { 
+        background-color: #3F00DE !important; 
+        color: white !important; 
+    }
 
     /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
