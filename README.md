@@ -35,7 +35,7 @@ If you enjoy it, consider showing your support - it helps keep the Guru online a
 ## 🧩 How It Works
 
 <p align="justify">
-BoardGame Guru is built on a <b>RAG (Retrieval-Augmented Generation)</b> architecture —
+BoardGame Guru is built on a <b>RAG (Retrieval-Augmented Generation)</b> architecture -
 a technique that uses retrieved information from your uploaded PDFs to augment the prompt
 of a large language model before generating an answer.</p>
 
