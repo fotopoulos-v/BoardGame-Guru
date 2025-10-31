@@ -1,6 +1,6 @@
 streamlit==1.29.0
 pypdf==3.15.2
 faiss-cpu==1.12.0
-sentence-transformers==2.2.2
+sentence-transformers>=2.7.0
 numpy>=1.26.4,<2
 transformers==4.39.3
