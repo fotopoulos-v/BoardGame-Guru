@@ -1,0 +1,38 @@
+# Python cache & compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+boardgame_app_venv/
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# macOS / Linux / Windows system files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# IDE / Editor config
+.vscode/
+.idea/
+
+# App-specific files
+database.csv
+pdfs/
+uploads/
+temp/
+previous_versions/
