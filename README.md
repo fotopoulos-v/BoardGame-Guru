@@ -14,9 +14,13 @@ Upload your board game rulebooks and ask questions in plain English — BoardGam
 
 ## 🚀 Try It Live
 
-👉 **[Launch BoardGame Guru on Streamlit →](https://boardgame-guru.streamlit.app/)**
+👉 **[Launch BoardGame Guru on Streamlit →](https://boardgame-guru.streamlit.app/)**  
+
+If you enjoy it, consider showing your support - it helps keep the Guru online and improving!  
+☕ **[Buy Me a Coffee](https://buymeacoffee.com/vasileios)**  
 
 ---
+
 
 ## 💡 Features
 
