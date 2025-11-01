@@ -227,26 +227,61 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
 GROQ_MODEL = "openai/gpt-oss-120b"
 
 def groq_generate(prompt, max_tokens=250, temperature=0):
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
-    payload = {"model": GROQ_MODEL, "input": prompt, "max_output_tokens": max_tokens, "temperature": temperature}
-    response = requests.post(GROQ_API_URL, headers=headers, data=json.dumps(payload))
-    if response.status_code != 200:
-        return f"API Error ({response.status_code}): {response.text}"
-    result = response.json()
-    if "output_text" in result and result["output_text"]:
-        return result["output_text"].strip()
-    if "choices" in result:
-        for choice in result["choices"]:
-            content = choice.get("message", {}).get("content")
-            if content:
-                return content.strip()
-    if "output" in result and len(result["output"]) > 0:
-        for item in result["output"]:
-            if "content" in item:
-                for c in item["content"]:
-                    if c.get("type") == "output_text" and c.get("text"):
-                        return c["text"].strip()
-    return "Unexpected response format from Groq."
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": GROQ_MODEL,
+        "input": prompt,
+        "max_output_tokens": max_tokens,
+        "temperature": temperature
+    }
+
+    try:
+        response = requests.post(GROQ_API_URL, headers=headers, data=json.dumps(payload))
+
+        # Handle known API limits and errors gracefully
+        if response.status_code == 429:
+            return (
+                "⚠️ The model usage limit has been reached. "
+                "Please try again in a few minutes. If the day limit has been reached, try again tomorrow."
+            )
+
+        elif response.status_code == 400:
+            return (
+                "⚠️ The model could not process your request."
+                "This can happen if the question is too long."
+                "Try rephrasing or shortening your question."
+            )
+
+        elif response.status_code != 200:
+            return f"❌ API Error ({response.status_code}): {response.text}"
+
+        result = response.json()
+
+        # Attempt to parse output from several possible response structures
+        if "output_text" in result and result["output_text"]:
+            return result["output_text"].strip()
+
+        if "choices" in result:
+            for choice in result["choices"]:
+                content = choice.get("message", {}).get("content")
+                if content:
+                    return content.strip()
+
+        if "output" in result and len(result["output"]) > 0:
+            for item in result["output"]:
+                if "content" in item:
+                    for c in item["content"]:
+                        if c.get("type") == "output_text" and c.get("text"):
+                            return c["text"].strip()
+
+        return "⚠️ Unexpected response format from Groq. Please try again."
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error while contacting Groq API: {e}"
+
 
 # ---------------------------
 # File uploader
