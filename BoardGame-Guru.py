@@ -8,6 +8,8 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 
 
 # ---------------------------
@@ -247,22 +249,32 @@ with st.sidebar:
 # ---------------------------
 # Sidebar: Daily token usage
 # ---------------------------
+TOKEN_FILE = Path("daily_tokens.json")
 MAX_TOKENS_PER_DAY = 200_000  # free-tier limit
+def load_daily_tokens():
+    """Load current daily token count from JSON. Reset if date changed."""
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    if TOKEN_FILE.exists():
+        data = json.loads(TOKEN_FILE.read_text())
+        if data.get("date") == today_str:
+            return data.get("tokens", 0)
+    # If file missing or date changed, start fresh
+    return 0
+
+def save_daily_tokens(tokens):
+    """Save daily token count to JSON."""
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    data = {"date": today_str, "tokens": tokens}
+    TOKEN_FILE.write_text(json.dumps(data))
+
+
 with st.sidebar:
     st.markdown("---")
-
     st.markdown("### 📊 Daily Token Usage")
 
-    now_utc = datetime.now(timezone.utc).date()
-
-    # Ensure counter exists even before first call
-    if "daily_token_usage" not in st.session_state:
-        st.session_state.daily_token_usage = {"date": now_utc, "tokens": 0}
-    elif st.session_state.daily_token_usage["date"] != now_utc:
-        st.session_state.daily_token_usage = {"date": now_utc, "tokens": 0}
-
-    used_tokens = st.session_state.daily_token_usage["tokens"]
-    used_percentage = min(used_tokens / MAX_TOKENS_PER_DAY, 1.0)
+    # Load latest token count
+    current_tokens = load_daily_tokens()
+    used_percentage = min(current_tokens / MAX_TOKENS_PER_DAY, 1.0)
 
     # Progress bar with percentage label
     st.progress(used_percentage, text=f"{used_percentage*100:.1f}%")
@@ -272,6 +284,8 @@ with st.sidebar:
         "<p style='color:#FCF2D9; font-size:14px;'>ℹ️ Token usage resets every day at 02:00 (Greece local time, UTC+2)</p>",
         unsafe_allow_html=True
 )
+
+print("Working directory:", Path.cwd())
 
 
 
@@ -318,16 +332,14 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
         result = response.json()
 
         # --- Track daily tokens (based on response headers) ---
+        # Calculate tokens used from Groq headers
         limit_tokens = int(response.headers.get("x-ratelimit-limit-tokens", 0))
         remaining_tokens = int(response.headers.get("x-ratelimit-remaining-tokens", 0))
-        total_tokens = limit_tokens - remaining_tokens
+        used_tokens = limit_tokens - remaining_tokens
 
-        # Update daily counter
-        now_utc = datetime.now(timezone.utc).date()
-        if "daily_token_usage" not in st.session_state or st.session_state.daily_token_usage["date"] != now_utc:
-            st.session_state.daily_token_usage = {"date": now_utc, "tokens": total_tokens}
-        else:
-            st.session_state.daily_token_usage["tokens"] += total_tokens
+        # Load global count, add this request's tokens, save
+        current_tokens = load_daily_tokens() + used_tokens
+        save_daily_tokens(current_tokens)
 
 
         # Attempt to parse output from several possible response structures
