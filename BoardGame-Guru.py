@@ -7,6 +7,7 @@ import json
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from datetime import datetime, timezone
 
 
 # ---------------------------
@@ -40,6 +41,29 @@ st.markdown(
     }
 
 
+ /* Reduce spacing for all headers and paragraphs in sidebar */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h4,
+    section[data-testid="stSidebar"] p {
+        margin-top: 2px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Reduce spacing above/below all Streamlit buttons in sidebar */
+    section[data-testid="stSidebar"] div.stButton > button {
+        margin-top: 4px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Optional: reduce spacing for markdown separators */
+    section[data-testid="stSidebar"] hr {
+        margin-top: 4px !important;
+        margin-bottom: 8px !important;
+    }
+
+    
     
     /* 1. Target the actual <textarea> element (background and live text color) */
     textarea {
@@ -152,9 +176,9 @@ if game_name_input:
 # ---------------------------
 with st.sidebar:
     if st.session_state.game_name:
-        st.markdown(f"<h3 style='color:#FFB703; font-size:20px; font-family:Comic Sans MS;'>{st.session_state.game_name}</h3>", 
+        st.markdown(f"<h3 style='color:#FFB703; font-size:20px; margin-bottom: 2px !important; font-family:Comic Sans MS;'>{st.session_state.game_name}</h3>", 
                     unsafe_allow_html=True)
-
+    st.markdown("---")
     if st.button("🧹 Reset Chat", key="reset"):
         st.session_state.messages = []
         st.session_state.last_uploaded_files = []
@@ -182,7 +206,7 @@ with st.sidebar:
         """
         <p style="color:#FCF2D9; font-size:16px;">
         💰 Support me!<br>
-        If you enjoy this app, consider buying me a coffee! Your support helps me maintain and improve the app.
+        Your support helps me maintain and improve the app.
         </p>
         """,
         unsafe_allow_html=True
@@ -202,6 +226,7 @@ with st.sidebar:
             font-weight:bold;
             cursor:pointer;
             margin-top:5px;
+            margin-bottom:18px;
             transition: all 0.3s ease;
         }
         .bmc-button:hover {
@@ -215,6 +240,38 @@ with st.sidebar:
         """,
         unsafe_allow_html=True
     )
+
+
+
+
+# ---------------------------
+# Sidebar: Daily token usage
+# ---------------------------
+MAX_TOKENS_PER_DAY = 200_000  # free-tier limit
+with st.sidebar:
+    st.markdown("---")
+
+    st.markdown("### 📊 Daily Token Usage")
+
+    now_utc = datetime.now(timezone.utc).date()
+
+    # Ensure counter exists even before first call
+    if "daily_token_usage" not in st.session_state:
+        st.session_state.daily_token_usage = {"date": now_utc, "tokens": 0}
+    elif st.session_state.daily_token_usage["date"] != now_utc:
+        st.session_state.daily_token_usage = {"date": now_utc, "tokens": 0}
+
+    used_tokens = st.session_state.daily_token_usage["tokens"]
+    used_percentage = min(used_tokens / MAX_TOKENS_PER_DAY, 1.0)
+
+    # Progress bar with percentage label
+    st.progress(used_percentage, text=f"{used_percentage*100:.1f}%")
+
+    # Add note about reset time
+    st.markdown(
+        "<p style='color:#FCF2D9; font-size:14px;'>ℹ️ Token usage resets every day at 02:00 (Greece local time, UTC+2)</p>",
+        unsafe_allow_html=True
+)
 
 
 
@@ -240,7 +297,7 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
 
     try:
         response = requests.post(GROQ_API_URL, headers=headers, data=json.dumps(payload))
-
+        
         # Handle known API limits and errors gracefully
         if response.status_code == 429:
             return (
@@ -259,6 +316,19 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
             return f"❌ API Error ({response.status_code}): {response.text}"
 
         result = response.json()
+
+        # --- Track daily tokens (based on response headers) ---
+        limit_tokens = int(response.headers.get("x-ratelimit-limit-tokens", 0))
+        remaining_tokens = int(response.headers.get("x-ratelimit-remaining-tokens", 0))
+        total_tokens = limit_tokens - remaining_tokens
+
+        # Update daily counter
+        now_utc = datetime.now(timezone.utc).date()
+        if "daily_token_usage" not in st.session_state or st.session_state.daily_token_usage["date"] != now_utc:
+            st.session_state.daily_token_usage = {"date": now_utc, "tokens": total_tokens}
+        else:
+            st.session_state.daily_token_usage["tokens"] += total_tokens
+
 
         # Attempt to parse output from several possible response structures
         if "output_text" in result and result["output_text"]:
@@ -281,6 +351,9 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
 
     except requests.exceptions.RequestException as e:
         return f"❌ Network error while contacting Groq API: {e}"
+
+
+
 
 
 # ---------------------------
