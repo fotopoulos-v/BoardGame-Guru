@@ -484,7 +484,7 @@ if query:
 
     # ---- RAG retrieval ----
     query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
-    top_k = 10
+    top_k = 6
     distances, indices = st.session_state.index.search(query_vec, top_k)
     retrieved_chunks = [st.session_state.all_chunks[i] for i in indices[0]]
     retrieved_text = "\n\n".join(retrieved_chunks)
@@ -507,7 +507,8 @@ if query:
     User's question: {query}
 
     Answer clearly and concisely, using only information from the rulebook.
-    If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided pdfs."
+    Please keep your answer under 1200 tokens.
+    If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
     """
 
 
