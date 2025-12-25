@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings('ignore', message='.*torch.classes.*')
+warnings.filterwarnings('ignore', message='.*resume_download.*')
 import os
 import streamlit as st
 from io import BytesIO
@@ -10,9 +13,7 @@ from sentence_transformers import SentenceTransformer
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-import warnings
-warnings.filterwarnings('ignore', message='.*torch.classes.*')
-warnings.filterwarnings('ignore', message='.*resume_download.*')
+
 
 
 # ---------------------------
