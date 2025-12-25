@@ -10,6 +10,9 @@ from sentence_transformers import SentenceTransformer
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import warnings
+warnings.filterwarnings('ignore', message='.*torch.classes.*')
+warnings.filterwarnings('ignore', message='.*resume_download.*')
 
 
 # ---------------------------
