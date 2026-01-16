@@ -409,7 +409,7 @@ if st.button("⚙️ Process PDFs"):
     file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
     pdf_texts = extract_pdf_texts(file_data)
 
-    def chunk_text(text, chunk_size=1200, overlap=200):
+    def chunk_text(text, chunk_size=2000, overlap=400):   # from 1200 - 200
         chunks = []
         start = 0
         while start < len(text):
