@@ -507,17 +507,18 @@ if query:
     
     # 5. Get chunks and sort by relevance
     retrieved_chunks = []
-    for idx in combined_indices:
+    for i, idx in enumerate(combined_indices):
         chunk = st.session_state.all_chunks[idx]
         metadata = st.session_state.chunk_metadata[idx]
         retrieved_chunks.append({
             'text': chunk,
             'metadata': metadata,
-            'has_header_match': idx in header_matches
+            'has_header_match': idx in header_matches,
+            'original_index': i  # Track original position
         })
     
-    # Sort: header matches first, then by index
-    retrieved_chunks.sort(key=lambda x: (not x['has_header_match'], combined_indices.index(retrieved_chunks.index(x))))
+    # Sort: header matches first, then by original index
+    retrieved_chunks.sort(key=lambda x: (not x['has_header_match'], x['original_index']))
     
     # 6. Format retrieved text with metadata
     formatted_chunks = []
