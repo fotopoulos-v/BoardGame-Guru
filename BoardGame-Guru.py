@@ -11,25 +11,18 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from datetime import datetime, timezone
-import json
 from pathlib import Path
-
-
 
 # ---------------------------
 # Settings
 # ---------------------------
 st.set_page_config(
     page_title="BoardGame Guru",
-    page_icon="assets/images/guru_logo.png",  
+    page_icon="assets/images/guru_logo.png" if os.path.exists("assets/images/guru_logo.png") else "🎲",
     layout="centered"
 )
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
-
-
-
-
 
 # ---------------------------
 # Custom CSS for styling
@@ -46,8 +39,7 @@ st.markdown(
         color: white !important; 
     }
 
-
- /* Reduce spacing for all headers and paragraphs in sidebar */
+    /* Reduce spacing for all headers and paragraphs in sidebar */
     section[data-testid="stSidebar"] h1,
     section[data-testid="stSidebar"] h2,
     section[data-testid="stSidebar"] h3,
@@ -68,8 +60,6 @@ st.markdown(
         margin-top: 4px !important;
         margin-bottom: 8px !important;
     }
-
-    
     
     /* 1. Target the actual <textarea> element (background and live text color) */
     textarea {
@@ -79,10 +69,9 @@ st.markdown(
 
     /* 2. Target the placeholder text color inside the <textarea> */
     textarea::placeholder {
-        color: #9F8DB0 !important; /* Bright color for visibility */
-        opacity: 0.8 !important;      /* Ensure full opacity */
+        color: #9F8DB0 !important;
+        opacity: 0.8 !important;
     }
-
     
     /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
@@ -132,7 +121,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 # ---------------------------
 # Session state defaults
 # ---------------------------
@@ -146,7 +134,7 @@ if "game_name" not in st.session_state:
     st.session_state.game_name = ""
 
 if "file_uploader_key" not in st.session_state:
-    st.session_state.file_uploader_key = 0  # used to reset uploader
+    st.session_state.file_uploader_key = 0
 
 if "pdfs_processed" not in st.session_state:
     st.session_state.pdfs_processed = False
@@ -156,12 +144,14 @@ if "pdfs_processed" not in st.session_state:
 # ---------------------------
 col1, col2 = st.columns([6, 23])
 with col1:
-    st.image("assets/images/guru_logo.png", width=120)
+    if os.path.exists("assets/images/guru_logo.png"):
+        st.image("assets/images/guru_logo.png", width=120)
+    else:
+        st.markdown("# 🎲")
 with col2:
-    st.markdown("<h1 style='color:#FAFAFA; margin-top: 15px;'>BoardGame Guru</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='color:#FAFAFA; margin-top: 15px;'>BoardGame Guru (Improved RAG)</h1>", unsafe_allow_html=True)
 
 st.write("Upload board game rulebooks in PDF format and ask questions about the rules!")
-
 
 # ---------------------------
 # Game Name Input
@@ -173,9 +163,6 @@ game_name_input = st.text_input(
 )
 if game_name_input:
     st.session_state.game_name = game_name_input
-
-
-
 
 # ---------------------------
 # Sidebar: Reset button & Game Name display
@@ -202,12 +189,8 @@ with st.sidebar:
 # ---------------------------
 # Sidebar: Buy Me a Coffee
 # ---------------------------
-
 with st.sidebar:
-    # Separator
     st.markdown("---")
-    
-    # Styled text
     st.markdown(
         """
         <p style="color:#FCF2D9; font-size:16px;">
@@ -217,8 +200,6 @@ with st.sidebar:
         """,
         unsafe_allow_html=True
     )
-
-    # Styled button with hover effect
     st.markdown(
         """
         <style>
@@ -247,14 +228,12 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-
-
-
 # ---------------------------
 # Sidebar: Daily token usage
 # ---------------------------
 TOKEN_FILE = Path("daily_tokens.json")
-MAX_TOKENS_PER_DAY = 200_000  # free-tier limit
+MAX_TOKENS_PER_DAY = 200_000
+
 def load_daily_tokens():
     """Load current daily token count from JSON. Reset if date changed."""
     today_str = datetime.now(timezone.utc).date().isoformat()
@@ -262,7 +241,6 @@ def load_daily_tokens():
         data = json.loads(TOKEN_FILE.read_text())
         if data.get("date") == today_str:
             return data.get("tokens", 0)
-    # If file missing or date changed, start fresh
     return 0
 
 def save_daily_tokens(tokens):
@@ -271,27 +249,16 @@ def save_daily_tokens(tokens):
     data = {"date": today_str, "tokens": tokens}
     TOKEN_FILE.write_text(json.dumps(data))
 
-
 with st.sidebar:
     st.markdown("---")
     st.markdown("### 📊 Daily Token Usage")
-
-    # Load latest token count
     current_tokens = load_daily_tokens()
     used_percentage = min(current_tokens / MAX_TOKENS_PER_DAY, 1.0)
-
-    # Progress bar with percentage label
     st.progress(used_percentage, text=f"{used_percentage*100:.1f}%")
-
-    # Add note about reset time
     st.markdown(
         "<p style='color:#FCF2D9; font-size:14px;'>ℹ️ Token usage resets every day at 02:00 (Greece local time, UTC+2)</p>",
         unsafe_allow_html=True
-)
-
-print("Working directory:", Path.cwd())
-
-
+    )
 
 # ---------------------------
 # Groq API setup
@@ -316,46 +283,37 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
     try:
         response = requests.post(GROQ_API_URL, headers=headers, data=json.dumps(payload))
         
-        # Handle known API limits and errors gracefully
         if response.status_code == 429:
             return (
                 "⚠️ The model usage limit has been reached. "
                 "Please try again in a few minutes. If the day limit has been reached, try again tomorrow."
             )
-
         elif response.status_code == 400:
             return (
-                "⚠️ The model could not process your request."
-                "This can happen if the question is too long."
+                "⚠️ The model could not process your request. "
+                "This can happen if the question is too long. "
                 "Try rephrasing or shortening your question."
             )
-
         elif response.status_code != 200:
             return f"❌ API Error ({response.status_code}): {response.text}"
 
         result = response.json()
 
-        # --- Track daily tokens (based on response headers) ---
-        # Calculate tokens used from Groq headers
+        # Track daily tokens
         limit_tokens = int(response.headers.get("x-ratelimit-limit-tokens", 0))
         remaining_tokens = int(response.headers.get("x-ratelimit-remaining-tokens", 0))
         used_tokens = limit_tokens - remaining_tokens
-
-        # Load global count, add this request's tokens, save
         current_tokens = load_daily_tokens() + used_tokens
         save_daily_tokens(current_tokens)
 
-
-        # Attempt to parse output from several possible response structures
+        # Parse output
         if "output_text" in result and result["output_text"]:
             return result["output_text"].strip()
-
         if "choices" in result:
             for choice in result["choices"]:
                 content = choice.get("message", {}).get("content")
                 if content:
                     return content.strip()
-
         if "output" in result and len(result["output"]) > 0:
             for item in result["output"]:
                 if "content" in item:
@@ -367,10 +325,6 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
 
     except requests.exceptions.RequestException as e:
         return f"❌ Network error while contacting Groq API: {e}"
-
-
-
-
 
 # ---------------------------
 # File uploader
@@ -395,7 +349,6 @@ if st.button("⚙️ Process PDFs"):
         st.cache_data.clear()
         st.cache_resource.clear()
         st.session_state.last_uploaded_files = current_files
-        # st.toast("🔄 New PDF(s) detected — cache and chat history cleared.", icon="🔁")
 
     @st.cache_data
     def extract_pdf_texts(file_data):
@@ -409,7 +362,9 @@ if st.button("⚙️ Process PDFs"):
     file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
     pdf_texts = extract_pdf_texts(file_data)
 
-    def chunk_text(text, chunk_size=2000, overlap=400):   # from 1200 - 200
+    # IMPROVED CHUNKING: Smaller chunks with better overlap
+    def chunk_text(text, chunk_size=800, overlap=200):
+        """Create smaller, more focused chunks with good overlap."""
         chunks = []
         start = 0
         while start < len(text):
@@ -425,6 +380,7 @@ if st.button("⚙️ Process PDFs"):
 
     @st.cache_resource
     def build_faiss_index(chunks):
+        # Using a better embedding model
         model = SentenceTransformer("all-MiniLM-L6-v2")
         embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
         index = faiss.IndexFlatL2(embeddings.shape[1])
@@ -440,12 +396,10 @@ if st.button("⚙️ Process PDFs"):
     st.session_state.pdfs_processed = True
     st.session_state.index_ready = True
 
-    # ✅ Store messages only (don't display yet)
     st.session_state.pdf_messages = [
         f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
-        f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
+        f"✅ Indexed {len(all_chunks)} text chunks for retrieval (improved chunking)"
     ]
-
 
 # ---------------------------
 # Stop until PDFs are processed
@@ -458,16 +412,11 @@ if "pdf_messages" in st.session_state:
     for msg in st.session_state.pdf_messages:
         st.success(msg)
 
-
-
 # ---------------------------
 # Visual separator before chat section
 # ---------------------------
 st.markdown("<hr style='border:2px solid cyan; margin-top:30px; margin-bottom:30px;'>", unsafe_allow_html=True)
 st.markdown("<h3 style='color:#00FFFF;'>💬 Chat with the Guru</h3>", unsafe_allow_html=True)
-
-
-
 
 # ---------------------------
 # Chat history
@@ -486,12 +435,36 @@ if query:
     with st.chat_message("user"):
         st.write(query)
 
-    # ---- RAG retrieval ----
-    query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
-    top_k = 6
-    distances, indices = st.session_state.index.search(query_vec, top_k)
-    retrieved_chunks = [st.session_state.all_chunks[i] for i in indices[0]]
+    # ---- IMPROVED RAG RETRIEVAL ----
+    
+    # 1. Query expansion - create variations of the query
+    query_variations = [
+        query,
+        query.upper(),  # Match headers like "TWO CHARACTER GAMES"
+        query.lower(),
+        query.replace("details about", "").strip(),  # Remove filler words
+        query.replace("tell me about", "").strip(),
+    ]
+    
+    # 2. Retrieve more chunks (increased from 6 to 12)
+    top_k = 12
+    all_retrieved_chunks = []
+    
+    for q in query_variations:
+        query_vec = st.session_state.model.encode([q], convert_to_numpy=True)
+        distances, indices = st.session_state.index.search(query_vec, top_k)
+        for idx in indices[0]:
+            chunk = st.session_state.all_chunks[idx]
+            if chunk not in all_retrieved_chunks:  # Avoid duplicates
+                all_retrieved_chunks.append(chunk)
+    
+    # 3. Take the best chunks (limit to top 10)
+    retrieved_chunks = all_retrieved_chunks[:10]
     retrieved_text = "\n\n".join(retrieved_chunks)
+
+    # 4. Show retrieved chunks for debugging
+    with st.expander("🔍 Retrieved Context (for debugging)", expanded=False):
+        st.text(retrieved_text[:2000] + "..." if len(retrieved_text) > 2000 else retrieved_text)
 
     # ---- Prompt construction ----
     recent_history = "\n".join(
@@ -513,8 +486,10 @@ if query:
     Answer clearly and concisely, using only information from the rulebook.
     Please keep your answer under 1200 tokens.
     If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
+    
+    IMPORTANT: If you see section headers or titles that match the user's query (like "TWO CHARACTER GAMES"), 
+    make sure to include that information in your answer.
     """
-
 
     # ---- Generate answer ----
     with st.chat_message("assistant"):
