@@ -4,45 +4,87 @@ warnings.filterwarnings('ignore', message='.*resume_download.*')
 import os
 import streamlit as st
 from io import BytesIO
+from pypdf import PdfReader
 import requests
 import json
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from datetime import datetime, timezone
+import json
 from pathlib import Path
-import re
 
-# Try pdfplumber first, fall back to pypdf
-try:
-    import pdfplumber
-    USE_PDFPLUMBER = True
-except ImportError:
-    from pypdf import PdfReader
-    USE_PDFPLUMBER = False
-    st.warning("⚠️ Install pdfplumber for better table extraction: `pip install pdfplumber`")
+
 
 # ---------------------------
 # Settings
 # ---------------------------
 st.set_page_config(
     page_title="BoardGame Guru",
-    page_icon="assets/images/guru_logo.png" if os.path.exists("assets/images/guru_logo.png") else "🎲",
+    page_icon="assets/images/guru_logo.png",  
     layout="centered"
 )
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
 
+
+
+
+
 # ---------------------------
-# Custom CSS (keeping your original styling)
+# Custom CSS for styling
 # ---------------------------
 st.markdown(
     """
     <style>
+    /* Sidebar background */
     section[data-testid="stSidebar"] { background-color: #2D1940; color: #FFB703; }
-    div[data-testid="stTextInput"] > div > input { background-color: #3F00DE !important; color: white !important; }
-    textarea { background-color: #531DB3 !important; color: white !important; }
-    textarea::placeholder { color: #9F8DB0 !important; opacity: 0.8 !important; }
+
+    /* Board Game Name input */
+    div[data-testid="stTextInput"] > div > input { 
+        background-color: #3F00DE !important; 
+        color: white !important; 
+    }
+
+
+ /* Reduce spacing for all headers and paragraphs in sidebar */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h4,
+    section[data-testid="stSidebar"] p {
+        margin-top: 2px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Reduce spacing above/below all Streamlit buttons in sidebar */
+    section[data-testid="stSidebar"] div.stButton > button {
+        margin-top: 4px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Optional: reduce spacing for markdown separators */
+    section[data-testid="stSidebar"] hr {
+        margin-top: 4px !important;
+        margin-bottom: 8px !important;
+    }
+
+    
+    
+    /* 1. Target the actual <textarea> element (background and live text color) */
+    textarea {
+        background-color: #531DB3 !important; 
+        color: white !important; 
+    }
+
+    /* 2. Target the placeholder text color inside the <textarea> */
+    textarea::placeholder {
+        color: #9F8DB0 !important; /* Bright color for visibility */
+        opacity: 0.8 !important;      /* Ensure full opacity */
+    }
+
+    
+    /* Drag & drop uploader */
     div[data-testid="stFileUploader"] > section {
         background-color: #E3B646 !important;
         border: 3px dashed black !important;
@@ -53,44 +95,73 @@ st.markdown(
         font-size: 18px !important;
         text-align: center !important;
     }
+    div[data-testid="stFileUploader"] > section * { color: black !important; font-weight: bold !important; }
+    div[data-testid="stFileUploader"] section button {
+        background-color: #08010D !important; color: #E3B646 !important;
+        border: 2px solid #E3B646 !important; border-radius: 8px !important;
+        padding: 8px 16px !important; font-weight: bold !important; font-size: 16px !important; cursor: pointer !important;
+    }
+    div[data-testid="stFileUploader"] section button:hover { background-color: #000000 !important; color: #FAFAFA !important; }
+
+    .stAlert.stAlert-info { background-color: #2C2C3C !important; color: #FAFAFA !important; border: 1px solid #FFB703 !important; }
+
+    /* Reset Chat button (sidebar) */
     section[data-testid="stSidebar"] div.stButton > button {
         background-color: #D13B3B !important; color: #FAFAFA !important;
         border-radius: 8px !important; border: 2px solid #8B0000 !important;
-        font-weight: bold !important; font-size: 16px !important;
+        font-weight: bold !important; font-size: 16px !important; width: 160px !important; height: 42px !important;
+        margin-top: 10px !important; transition: all 0.2s ease-in-out !important;
     }
+    section[data-testid="stSidebar"] div.stButton > button:hover { background-color: #DE0202 !important; color: white !important; transform: scale(1.05); }
+
+    button[title="Close sidebar"], button[title="Open sidebar"] { background-color: transparent !important; border: none !important; color: inherit !important; }
+
+    /* Process PDFs button (main) */
     div[data-testid="stButton"] > button {
         background-color: #569958 !important; color: white !important; 
-        border-radius: 8px !important; height: 42px !important;
-        font-weight: bold !important; font-size: 16px !important;
+        border-radius: 8px !important; height: 42px !important; width: 160px !important;
+        font-weight: bold !important; font-size: 16px !important; border: 2px solid #2E7D32 !important;
+        transition: all 0.2s ease-in-out !important;
     }
+    div[data-testid="stButton"] > button:hover { background-color: #027300 !important; transform: scale(1.05); }
+
+    /* Sticky game name */
+    .sticky-game-name { position: sticky; top: 0; background-color:#08010D; color:#FFB703; padding:5px; z-index:1000; font-size: 40px; font-weight: bold; }
     </style>
     """,
     unsafe_allow_html=True
 )
 
+
 # ---------------------------
-# Session state
+# Session state defaults
 # ---------------------------
-for key in ["messages", "last_uploaded_files", "game_name", "file_uploader_key", "pdfs_processed"]:
-    if key not in st.session_state:
-        if key == "file_uploader_key":
-            st.session_state[key] = 0
-        elif key == "pdfs_processed":
-            st.session_state[key] = False
-        else:
-            st.session_state[key] = [] if key.endswith("files") or key == "messages" else ""
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "last_uploaded_files" not in st.session_state:
+    st.session_state.last_uploaded_files = []
+
+if "game_name" not in st.session_state:
+    st.session_state.game_name = ""
+
+if "file_uploader_key" not in st.session_state:
+    st.session_state.file_uploader_key = 0  # used to reset uploader
+
+if "pdfs_processed" not in st.session_state:
+    st.session_state.pdfs_processed = False
 
 # ---------------------------
 # App header
 # ---------------------------
 col1, col2 = st.columns([6, 23])
 with col1:
-    if os.path.exists("assets/images/guru_logo.png"):
-        st.image("assets/images/guru_logo.png", width=120)
+    st.image("assets/images/guru_logo.png", width=120)
 with col2:
-    st.markdown("<h1 style='color:#FAFAFA; margin-top: 15px;'>BoardGame Guru v3</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='color:#FAFAFA; margin-top: 15px;'>BoardGame Guru</h1>", unsafe_allow_html=True)
 
-st.write(f"Upload board game rulebooks in PDF format. Using: **{'pdfplumber' if USE_PDFPLUMBER else 'pypdf'}**")
+st.write("Upload board game rulebooks in PDF format and ask questions about the rules!")
+
 
 # ---------------------------
 # Game Name Input
@@ -103,81 +174,203 @@ game_name_input = st.text_input(
 if game_name_input:
     st.session_state.game_name = game_name_input
 
+
+
+
 # ---------------------------
-# Sidebar
+# Sidebar: Reset button & Game Name display
 # ---------------------------
 with st.sidebar:
     if st.session_state.game_name:
-        st.markdown(f"<h3 style='color:#FFB703;'>{st.session_state.game_name}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color:#FFB703; font-size:20px; margin-bottom: 2px !important; font-family:Comic Sans MS;'>{st.session_state.game_name}</h3>", 
+                    unsafe_allow_html=True)
     st.markdown("---")
-    if st.button("🧹 Reset Chat"):
-        for key in ["messages", "last_uploaded_files", "game_name"]:
-            st.session_state[key] = [] if isinstance(st.session_state[key], list) else ""
+    if st.button("🧹 Reset Chat", key="reset"):
+        st.session_state.messages = []
+        st.session_state.last_uploaded_files = []
+        st.session_state.game_name = ""
         st.session_state.file_uploader_key += 1
         st.session_state.pdfs_processed = False
-        for key in ["model", "index", "all_chunks"]:
-            st.session_state.pop(key, None)
+        st.session_state.pop("model", None)
+        st.session_state.pop("index", None)
+        st.session_state.pop("embeddings", None)
+        st.session_state.pop("all_chunks", None)
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
 
-# Token tracking
-TOKEN_FILE = Path("daily_tokens.json")
-MAX_TOKENS_PER_DAY = 200_000
+# ---------------------------
+# Sidebar: Buy Me a Coffee
+# ---------------------------
 
+with st.sidebar:
+    # Separator
+    st.markdown("---")
+    
+    # Styled text
+    st.markdown(
+        """
+        <p style="color:#FCF2D9; font-size:16px;">
+        💰 Support me!<br>
+        Your support helps me maintain and improve the app.
+        </p>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Styled button with hover effect
+    st.markdown(
+        """
+        <style>
+        .bmc-button {
+            background-color:#3679AD;
+            color:white;
+            border:none;
+            border-radius:8px;
+            padding:10px 20px;
+            font-size:16px;
+            font-weight:bold;
+            cursor:pointer;
+            margin-top:5px;
+            margin-bottom:18px;
+            transition: all 0.3s ease;
+        }
+        .bmc-button:hover {
+            background-color:#003AAB;
+            transform: scale(1.05);
+        }
+        </style>
+        <a href="https://buymeacoffee.com/vasileios" target="_blank">
+            <button class="bmc-button">☕ Buy Me a Coffee</button>
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+
+
+# ---------------------------
+# Sidebar: Daily token usage
+# ---------------------------
+TOKEN_FILE = Path("daily_tokens.json")
+MAX_TOKENS_PER_DAY = 200_000  # free-tier limit
 def load_daily_tokens():
-    today = datetime.now(timezone.utc).date().isoformat()
+    """Load current daily token count from JSON. Reset if date changed."""
+    today_str = datetime.now(timezone.utc).date().isoformat()
     if TOKEN_FILE.exists():
         data = json.loads(TOKEN_FILE.read_text())
-        if data.get("date") == today:
+        if data.get("date") == today_str:
             return data.get("tokens", 0)
+    # If file missing or date changed, start fresh
     return 0
 
 def save_daily_tokens(tokens):
-    today = datetime.now(timezone.utc).date().isoformat()
-    TOKEN_FILE.write_text(json.dumps({"date": today, "tokens": tokens}))
+    """Save daily token count to JSON."""
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    data = {"date": today_str, "tokens": tokens}
+    TOKEN_FILE.write_text(json.dumps(data))
+
 
 with st.sidebar:
     st.markdown("---")
     st.markdown("### 📊 Daily Token Usage")
+
+    # Load latest token count
     current_tokens = load_daily_tokens()
-    st.progress(min(current_tokens / MAX_TOKENS_PER_DAY, 1.0), 
-                text=f"{current_tokens / MAX_TOKENS_PER_DAY * 100:.1f}%")
+    used_percentage = min(current_tokens / MAX_TOKENS_PER_DAY, 1.0)
+
+    # Progress bar with percentage label
+    st.progress(used_percentage, text=f"{used_percentage*100:.1f}%")
+
+    # Add note about reset time
+    st.markdown(
+        "<p style='color:#FCF2D9; font-size:14px;'>ℹ️ Token usage resets every day at 02:00 (Greece local time, UTC+2)</p>",
+        unsafe_allow_html=True
+)
+
+print("Working directory:", Path.cwd())
+
+
 
 # ---------------------------
-# Groq API
+# Groq API setup
 # ---------------------------
 GROQ_API_KEY = st.secrets["groq"]["api_key"]
+os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
 GROQ_MODEL = "openai/gpt-oss-120b"
 
-def groq_generate(prompt, max_tokens=2000, temperature=0):
+def groq_generate(prompt, max_tokens=250, temperature=0):
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": GROQ_MODEL,
+        "input": prompt,
+        "max_output_tokens": max_tokens,
+        "temperature": temperature
+    }
+
     try:
-        response = requests.post(
-            GROQ_API_URL,
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
-            json={"model": GROQ_MODEL, "input": prompt, "max_output_tokens": max_tokens, "temperature": temperature}
-        )
+        response = requests.post(GROQ_API_URL, headers=headers, data=json.dumps(payload))
         
-        if response.status_code != 200:
-            return f"⚠️ API Error ({response.status_code})"
-        
+        # Handle known API limits and errors gracefully
+        if response.status_code == 429:
+            return (
+                "⚠️ The model usage limit has been reached. "
+                "Please try again in a few minutes. If the day limit has been reached, try again tomorrow."
+            )
+
+        elif response.status_code == 400:
+            return (
+                "⚠️ The model could not process your request."
+                "This can happen if the question is too long."
+                "Try rephrasing or shortening your question."
+            )
+
+        elif response.status_code != 200:
+            return f"❌ API Error ({response.status_code}): {response.text}"
+
         result = response.json()
-        
-        # Track tokens
-        limit = int(response.headers.get("x-ratelimit-limit-tokens", 0))
-        remaining = int(response.headers.get("x-ratelimit-remaining-tokens", 0))
-        save_daily_tokens(load_daily_tokens() + (limit - remaining))
-        
-        # Parse response
-        if "output_text" in result:
+
+        # --- Track daily tokens (based on response headers) ---
+        # Calculate tokens used from Groq headers
+        limit_tokens = int(response.headers.get("x-ratelimit-limit-tokens", 0))
+        remaining_tokens = int(response.headers.get("x-ratelimit-remaining-tokens", 0))
+        used_tokens = limit_tokens - remaining_tokens
+
+        # Load global count, add this request's tokens, save
+        current_tokens = load_daily_tokens() + used_tokens
+        save_daily_tokens(current_tokens)
+
+
+        # Attempt to parse output from several possible response structures
+        if "output_text" in result and result["output_text"]:
             return result["output_text"].strip()
+
         if "choices" in result:
-            return result["choices"][0].get("message", {}).get("content", "").strip()
-        
-        return "⚠️ Unexpected response format"
-    except Exception as e:
-        return f"❌ Error: {e}"
+            for choice in result["choices"]:
+                content = choice.get("message", {}).get("content")
+                if content:
+                    return content.strip()
+
+        if "output" in result and len(result["output"]) > 0:
+            for item in result["output"]:
+                if "content" in item:
+                    for c in item["content"]:
+                        if c.get("type") == "output_text" and c.get("text"):
+                            return c["text"].strip()
+
+        return "⚠️ Unexpected response format from Groq. Please try again."
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error while contacting Groq API: {e}"
+
+
+
+
 
 # ---------------------------
 # File uploader
@@ -188,13 +381,12 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True,
     key=f"file_uploader_{st.session_state.file_uploader_key}"
 )
-
 if not uploaded_files:
     st.info("Please upload one or more PDF rulebooks to continue.")
     st.stop()
 
 # ---------------------------
-# Process PDFs
+# Process PDFs button
 # ---------------------------
 if st.button("⚙️ Process PDFs"):
     current_files = [f.name for f in uploaded_files]
@@ -203,127 +395,90 @@ if st.button("⚙️ Process PDFs"):
         st.cache_data.clear()
         st.cache_resource.clear()
         st.session_state.last_uploaded_files = current_files
+        # st.toast("🔄 New PDF(s) detected — cache and chat history cleared.", icon="🔁")
 
     @st.cache_data
-    def extract_pdf_text(file_data):
-        """Extract text using pdfplumber or pypdf."""
-        all_text = []
-        
+    def extract_pdf_texts(file_data):
+        pdf_texts = []
         for file_name, file_content in file_data:
-            if USE_PDFPLUMBER:
-                # Better table handling
-                with pdfplumber.open(BytesIO(file_content)) as pdf:
-                    for page_num, page in enumerate(pdf.pages, 1):
-                        text = page.extract_text() or ""
-                        # Extract tables separately and format them
-                        tables = page.extract_tables()
-                        if tables:
-                            text += "\n\n[TABLES ON THIS PAGE]:\n"
-                            for table in tables:
-                                # Format table as text
-                                for row in table:
-                                    text += " | ".join(str(cell) if cell else "" for cell in row) + "\n"
-                        
-                        all_text.append({
-                            'file': file_name,
-                            'page': page_num,
-                            'text': text
-                        })
-            else:
-                # Fallback to pypdf
-                reader = PdfReader(BytesIO(file_content))
-                for page_num, page in enumerate(reader.pages, 1):
-                    text = page.extract_text() or ""
-                    all_text.append({
-                        'file': file_name,
-                        'page': page_num,
-                        'text': text
-                    })
-        
-        return all_text
+            reader = PdfReader(BytesIO(file_content))
+            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+            pdf_texts.append((file_name, text))
+        return pdf_texts
 
     file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
-    pages = extract_pdf_text(file_data)
+    pdf_texts = extract_pdf_texts(file_data)
 
-    # Smaller, smarter chunking
-    def create_chunks(pages, chunk_size=500, overlap=100):
+    def chunk_text(text, chunk_size=2000, overlap=400):   # from 1200 - 200
         chunks = []
-        for page_data in pages:
-            text = page_data['text']
-            # Clean text
-            text = re.sub(r'\s+', ' ', text).strip()
-            
-            # Detect section headers (ALL CAPS lines)
-            header = None
-            lines = text.split('\n')
-            for line in lines[:5]:
-                line = line.strip()
-                if line and line.isupper() and 5 < len(line) < 80:
-                    header = line
-                    break
-            
-            # Create chunks
-            if len(text) < chunk_size:
-                chunks.append({
-                    'text': text,
-                    'page': page_data['page'],
-                    'file': page_data['file'],
-                    'header': header
-                })
-            else:
-                start = 0
-                while start < len(text):
-                    end = min(start + chunk_size, len(text))
-                    chunk_text = text[start:end]
-                    
-                    # Prepend header to first chunk
-                    if start == 0 and header:
-                        chunk_text = f"[{header}]\n{chunk_text}"
-                    
-                    chunks.append({
-                        'text': chunk_text,
-                        'page': page_data['page'],
-                        'file': page_data['file'],
-                        'header': header
-                    })
-                    start += chunk_size - overlap
-        
+        start = 0
+        while start < len(text):
+            end = min(start + chunk_size, len(text))
+            chunks.append(text[start:end])
+            start += chunk_size - overlap
         return chunks
 
-    all_chunks = create_chunks(pages)
+    all_chunks = []
+    for name, text in pdf_texts:
+        chunks = chunk_text(text)
+        all_chunks.extend(chunks)
 
     @st.cache_resource
-    def build_index(chunk_texts):
-        # Use faster, smaller model for speed
+    def build_faiss_index(chunks):
         model = SentenceTransformer("all-MiniLM-L6-v2")
-        embeddings = model.encode(chunk_texts, show_progress_bar=True)
+        embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
         index = faiss.IndexFlatL2(embeddings.shape[1])
         index.add(embeddings)
-        return index, model
+        return index, model, embeddings
 
-    chunk_texts = [c['text'] for c in all_chunks]
-    index, model = build_index(chunk_texts)
+    index, model, embeddings = build_faiss_index(all_chunks)
 
     st.session_state.index = index
     st.session_state.model = model
+    st.session_state.embeddings = embeddings
     st.session_state.all_chunks = all_chunks
     st.session_state.pdfs_processed = True
+    st.session_state.index_ready = True
 
-    st.success(f"✅ Processed {len(pages)} pages → {len(all_chunks)} chunks")
+    # ✅ Store messages only (don't display yet)
+    st.session_state.pdf_messages = [
+        f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
+        f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
+    ]
 
+
+# ---------------------------
+# Stop until PDFs are processed
+# ---------------------------
 if not st.session_state.get("pdfs_processed", False):
     st.stop()
 
-st.markdown("<hr style='border:2px solid cyan;'>", unsafe_allow_html=True)
-st.markdown("<h3 style='color:#00FFFF;'>💬 Chat with the Guru</h3>", unsafe_allow_html=True)
+# Redisplay success messages after re-run
+if "pdf_messages" in st.session_state:
+    for msg in st.session_state.pdf_messages:
+        st.success(msg)
+
+
 
 # ---------------------------
-# Chat
+# Visual separator before chat section
+# ---------------------------
+st.markdown("<hr style='border:2px solid cyan; margin-top:30px; margin-bottom:30px;'>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:#00FFFF;'>💬 Chat with the Guru</h3>", unsafe_allow_html=True)
+
+
+
+
+# ---------------------------
+# Chat history
 # ---------------------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
+# ---------------------------
+# Chat input
+# ---------------------------
 query = st.chat_input("Ask a question about the rules:")
 
 if query:
@@ -331,64 +486,40 @@ if query:
     with st.chat_message("user"):
         st.write(query)
 
-    # Simple but effective retrieval
-    query_variations = [
-        query,
-        query.upper(),
-        query.lower(),
-        # Extract keywords
-        " ".join([w for w in query.lower().split() if len(w) > 3])
-    ]
-    
-    # Get more chunks
-    all_indices = set()
-    for q in query_variations:
-        vec = st.session_state.model.encode([q])
-        _, indices = st.session_state.index.search(vec, 20)
-        all_indices.update(indices[0].tolist())
-    
-    # Get chunks with metadata
-    retrieved = []
-    for idx in list(all_indices)[:15]:
-        chunk = st.session_state.all_chunks[idx]
-        retrieved.append(chunk)
-    
-    # Sort by header match
-    query_keywords = set(query.lower().split())
-    retrieved.sort(key=lambda c: (
-        not (c.get('header') and any(k in c['header'].lower() for k in query_keywords)),
-        -len(c['text'])
-    ))
-    
-    # Format context
-    context_parts = []
-    for chunk in retrieved[:10]:
-        header = f"[{chunk['header']}]" if chunk.get('header') else ""
-        page = f"(Page {chunk['page']})"
-        context_parts.append(f"{header} {page}\n{chunk['text']}")
-    
-    context = "\n\n---\n\n".join(context_parts)
-    
-    # Debug
-    with st.expander("🔍 Retrieved Context"):
-        st.text(context[:2000] + "..." if len(context) > 2000 else context)
-    
-    # Generate answer
-    prompt = f"""You are a board game rules expert.
+    # ---- RAG retrieval ----
+    query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
+    top_k = 6
+    distances, indices = st.session_state.index.search(query_vec, top_k)
+    retrieved_chunks = [st.session_state.all_chunks[i] for i in indices[0]]
+    retrieved_text = "\n\n".join(retrieved_chunks)
 
-Rulebook excerpts (with section headers and page numbers):
+    # ---- Prompt construction ----
+    recent_history = "\n".join(
+        [f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.messages[-3:]]
+    )
 
-{context}
+    prompt = f"""
+    You are a board game rules expert.
 
-User question: {query}
+    Here are the most relevant excerpts from the rulebook:
 
-Answer using ONLY the rulebook excerpts above. Pay attention to [SECTION] headers. 
-Include page numbers when citing rules. If not found, say so.
-"""
+    {retrieved_text}
 
+    Recent conversation (for reference only — ignore if unrelated):
+    {recent_history}
+
+    User's question: {query}
+
+    Answer clearly and concisely, using only information from the rulebook.
+    Please keep your answer under 1200 tokens.
+    If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
+    """
+
+
+    # ---- Generate answer ----
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            answer = groq_generate(prompt, max_tokens=2000)
+        with st.spinner("Meditating..."):
+            answer = groq_generate(prompt, max_tokens=3000, temperature=0.3)
             st.write(answer)
-    
+
     st.session_state.messages.append({"role": "assistant", "content": answer})
