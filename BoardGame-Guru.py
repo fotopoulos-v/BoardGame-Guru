@@ -267,9 +267,8 @@ with st.sidebar:
                 encoded_image = base64.b64encode(img_file.read()).decode()
             image_html = f'<img src="data:image/png;base64,{encoded_image}" alt="{title}" style="width:{width}px; height:auto; display:block; border-radius:8px; flex-shrink:0;">'
 
-        st.html(
+        st.markdown(
             f'''
-            <style>body {{ margin:0; padding:0; }}</style>
             <a href="{target_url}" target="_blank" rel="noopener noreferrer"
                style="display:block; text-decoration:none; cursor:pointer;
                       background-color:#021421; border:1px solid #6A2B96;
@@ -280,7 +279,8 @@ with st.sidebar:
                 </div>
                 <p style="color:#E6D8F0; font-size:12px; margin:0; line-height:1.4;">{description}</p>
             </a>
-            '''
+            ''',
+            unsafe_allow_html=True,
         )
 
     st.markdown("---")
