@@ -273,11 +273,11 @@ with st.sidebar:
                style="display:block; text-decoration:none; cursor:pointer;
                       background-color:#021421; border:1px solid #6A2B96;
                       border-radius:10px; padding:10px 12px; margin:2px 0 12px 0;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+                <span style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
                     {image_html}
                     <span style="color:#FCF2D9; font-size:15px; font-weight:700;">{title}</span>
-                </div>
-                <p style="color:#E6D8F0; font-size:12px; margin:0; line-height:1.4;">{description}</p>
+                </span>
+                <span style="display:block; color:#E6D8F0; font-size:12px; margin:0; line-height:1.4;">{description}</span>
             </a>
             ''',
             unsafe_allow_html=True,
