@@ -269,16 +269,16 @@ with st.sidebar:
 
         st.markdown(
             f'''
-            <div style="background-color:#021421; border:1px solid #6A2B96;
-                        border-radius:10px; padding:10px 12px; margin:2px 0;">
-                <a href="{target_url}" target="_blank" rel="noopener noreferrer"
-                   style="display:flex; align-items:center; gap:10px; margin-bottom:4px;
-                          text-decoration:none; cursor:pointer;">
+            <a href="{target_url}" target="_blank" rel="noopener noreferrer"
+               style="display:block; text-decoration:none; cursor:pointer;
+                      background-color:#021421; border:1px solid #6A2B96;
+                      border-radius:10px; padding:10px 12px; margin:2px 0 12px 0;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
                     {image_html}
                     <span style="color:#FCF2D9; font-size:15px; font-weight:700;">{title}</span>
-                </a>
+                </div>
                 <p style="color:#E6D8F0; font-size:12px; margin:0; line-height:1.4;">{description}</p>
-            </div>
+            </a>
             ''',
             unsafe_allow_html=True,
         )
@@ -323,7 +323,9 @@ def save_daily_tokens(tokens):
 
 
 with st.sidebar:
+    st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
     st.markdown("---")
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
     st.markdown("### 📊 Daily Token Usage")
 
     # Load latest token count
