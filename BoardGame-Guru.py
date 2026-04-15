@@ -260,45 +260,6 @@ with st.sidebar:
     broke_logo_path = os.path.join(_app_dir, "assets", "images", "broke_logo.png")
     boardgame_broke_url = "#"  # TODO: replace with your deployed BoardGame Broke URL
 
-    # def render_sidebar_promo_card(image_path, target_url, title, description, width=48):
-    #     image_html = ""
-    #     if os.path.exists(image_path):
-    #         with open(image_path, "rb") as img_file:
-    #             encoded_image = base64.b64encode(img_file.read()).decode()
-    #         image_html = f'<img src="data:image/png;base64,{encoded_image}" alt="{title}" style="width:{width}px; height:auto; display:block; border-radius:8px; flex-shrink:0;">'
-
-    #     st.markdown(
-    #         f'''
-    #         <a href="{target_url}" target="_blank" rel="noopener noreferrer"
-    #            style="display:block; text-decoration:none; cursor:pointer;
-    #                   background-color:#021421; border:1px solid #6A2B96;
-    #                   border-radius:10px; padding:10px 12px; margin:2px 0;">
-    #             <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
-    #                 {image_html}
-    #                 <span style="color:#FCF2D9; font-size:15px; font-weight:700;">{title}</span>
-    #             </div>
-    #             <p style="color:#E6D8F0; font-size:12px; margin:0; line-height:1.4;">{description}</p>
-    #         </a>
-    #         ''',
-    #         unsafe_allow_html=True,
-    #     )
-
-    # st.markdown("---")
-    # st.markdown('<p style="color:#FCF2D9; font-size:14px; font-weight:600; margin:0 0 4px 0;">🎮 Check my other apps!</p>', unsafe_allow_html=True)
-    # render_sidebar_promo_card(
-    #     scout_logo_path,
-    #     "https://boardgame-scout.streamlit.app/",
-    #     "BoardGame Scout",
-    #     "Discover games and get recommendations through the entire BGG database.",
-    # )
-
-    # render_sidebar_promo_card(
-    #     broke_logo_path,
-    #     boardgame_broke_url,
-    #     "BoardGame Broke",
-    #     "Compare Greek store prices and availability for board games.",
-    # )
-
     def render_sidebar_promo_card(image_path, target_url, title, description, width=48):
         image_html = ""
         if os.path.exists(image_path):
@@ -306,36 +267,29 @@ with st.sidebar:
                 encoded_image = base64.b64encode(img_file.read()).decode()
             image_html = f'<img src="data:image/png;base64,{encoded_image}" alt="{title}" style="width:{width}px; height:auto; display:block; border-radius:8px; flex-shrink:0;">'
 
-        st.html(
+        st.markdown(
             f'''
-            <style>body {{ margin:0; padding:0; }}</style>
-            <a href="{target_url}" target="_blank" rel="noopener noreferrer"
-               style="display:block; text-decoration:none; cursor:pointer;
-                      background-color:#331D42; border:1px solid #6A2B96;
-                      border-radius:10px; padding:10px 12px; margin:2px 0;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+            <div style="background-color:#021421; border:1px solid #6A2B96;
+                        border-radius:10px; padding:10px 12px; margin:2px 0;">
+                <a href="{target_url}" target="_blank" rel="noopener noreferrer"
+                   style="display:flex; align-items:center; gap:10px; margin-bottom:4px;
+                          text-decoration:none; cursor:pointer;">
                     {image_html}
                     <span style="color:#FCF2D9; font-size:15px; font-weight:700;">{title}</span>
-                </div>
+                </a>
                 <p style="color:#E6D8F0; font-size:12px; margin:0; line-height:1.4;">{description}</p>
-            </a>
-            '''
+            </div>
+            ''',
+            unsafe_allow_html=True,
         )
 
-    st.markdown('<br><div style="border-top:2px solid #8F6863; margin-top:4px; margin-bottom:4px;"></div>', unsafe_allow_html=True)
+    st.markdown("---")
     st.markdown('<p style="color:#FCF2D9; font-size:14px; font-weight:600; margin:0 0 4px 0;">🎮 Check my other apps!</p>', unsafe_allow_html=True)
-    # render_sidebar_promo_card(
-    #     guru_logo_path,
-    #     "https://boardgame-guru.streamlit.app/",
-    #     "BoardGame Guru",
-    #     "Upload rulebooks and ask rules questions instantly.",
-    # )
-
     render_sidebar_promo_card(
         scout_logo_path,
         "https://boardgame-scout.streamlit.app/",
         "BoardGame Scout",
-        "Discover games and get recommendations through the official BoardGameGeek API.",
+        "Discover games and get recommendations through the entire BGG database.",
     )
 
     # render_sidebar_promo_card(
@@ -344,7 +298,6 @@ with st.sidebar:
     #     "BoardGame Broke",
     #     "Compare Greek store prices and availability for board games.",
     # )
-
 
 
 # ---------------------------
