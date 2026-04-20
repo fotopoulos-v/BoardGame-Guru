@@ -292,12 +292,12 @@ with st.sidebar:
         "Discover games and get recommendations through the entire BGG database.",
     )
 
-    # render_sidebar_promo_card(
-    #     broke_logo_path,
-    #     boardgame_broke_url,
-    #     "BoardGame Broke",
-    #     "Compare Greek store prices and availability for board games.",
-    # )
+    render_sidebar_promo_card(
+        broke_logo_path,
+        boardgame_broke_url,
+        "BoardGame Broke",
+        "Compare Greek store prices and availability for board games.",
+    )
 
 
 # ---------------------------
