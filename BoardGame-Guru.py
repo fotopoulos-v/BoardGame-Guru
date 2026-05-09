@@ -258,7 +258,7 @@ with st.sidebar:
     _app_dir = os.path.dirname(os.path.abspath(__file__))
     scout_logo_path = os.path.join(_app_dir, "assets", "images", "scout_logo.png")
     broke_logo_path = os.path.join(_app_dir, "assets", "images", "broke_logo.png")
-    boardgame_broke_url = "https://boardgame-broke.streamlit.app/"
+
 
     def render_sidebar_promo_card(image_path, target_url, title, description, width=48):
         image_html = ""
@@ -294,7 +294,7 @@ with st.sidebar:
 
     render_sidebar_promo_card(
         broke_logo_path,
-        boardgame_broke_url,
+        "https://boardgame-broke.streamlit.app/",
         "BoardGame Broke",
         "Compare Greek store prices and availability for board games.",
     )
