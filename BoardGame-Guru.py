@@ -258,7 +258,7 @@ with st.sidebar:
     _app_dir = os.path.dirname(os.path.abspath(__file__))
     scout_logo_path = os.path.join(_app_dir, "assets", "images", "scout_logo.png")
     broke_logo_path = os.path.join(_app_dir, "assets", "images", "broke_logo.png")
-    boardgame_broke_url = "#"  # TODO: replace with your deployed BoardGame Broke URL
+    boardgame_broke_url = "https://boardgame-broke.streamlit.app/"
 
     def render_sidebar_promo_card(image_path, target_url, title, description, width=48):
         image_html = ""
