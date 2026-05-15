@@ -128,6 +128,7 @@ st.markdown(
 
     /* Sticky game name */
     .sticky-game-name { position: sticky; top: 0; background-color:#08010D; color:#FFB703; padding:5px; z-index:1000; font-size: 40px; font-weight: bold; }
+
     </style>
     """,
     unsafe_allow_html=True
@@ -151,6 +152,9 @@ if "file_uploader_key" not in st.session_state:
 
 if "pdfs_processed" not in st.session_state:
     st.session_state.pdfs_processed = False
+
+if "processing_pdfs" not in st.session_state:
+    st.session_state.processing_pdfs = False
 
 # ---------------------------
 # App header
@@ -192,10 +196,12 @@ with st.sidebar:
         st.session_state.game_name = ""
         st.session_state.file_uploader_key += 1
         st.session_state.pdfs_processed = False
+        st.session_state.processing_pdfs = False
         st.session_state.pop("model", None)
         st.session_state.pop("index", None)
         st.session_state.pop("embeddings", None)
         st.session_state.pop("all_chunks", None)
+        st.session_state.pop("pdf_messages", None)
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
@@ -421,6 +427,82 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
         return f"❌ Network error while contacting Groq API: {e}"
 
 
+def _rag_generate(query):
+    """Run RAG retrieval and build an answer via Groq."""
+    query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
+    top_k = 6
+    distances, idxs = st.session_state.index.search(query_vec, top_k)
+    retrieved_chunks = [st.session_state.all_chunks[i] for i in idxs[0]]
+    retrieved_text = "\n\n".join(retrieved_chunks)
+
+    recent_history = "\n".join(
+        [f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.messages[-3:]]
+    )
+
+    prompt = f"""
+    You are a board game rules expert.
+
+    Here are the most relevant excerpts from the rulebook:
+
+    {retrieved_text}
+
+    Recent conversation (for reference only — ignore if unrelated):
+    {recent_history}
+
+    User's question: {query}
+
+    Answer clearly and concisely, using only information from the rulebook.
+    Please keep your answer under 1200 tokens.
+    If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
+    """
+    return groq_generate(prompt, max_tokens=3000, temperature=0.3)
+
+
+@st.fragment
+def chat_ui():
+    """Renders chat history and generates answer as a fragment — no full-page flash."""
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+
+    # Generate only when the last message is from the user
+    if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+        with st.chat_message("assistant"):
+            with st.spinner("Meditating..."):
+                answer = _rag_generate(st.session_state.messages[-1]["content"])
+                st.write(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+
+@st.cache_data
+def extract_pdf_texts(file_data):
+    pdf_texts = []
+    for file_name, file_content in file_data:
+        reader = PdfReader(BytesIO(file_content))
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        pdf_texts.append((file_name, text))
+    return pdf_texts
+
+
+def chunk_text(text, chunk_size=2000, overlap=400):   # from 1200 - 200
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunks.append(text[start:end])
+        start += chunk_size - overlap
+    return chunks
+
+
+@st.cache_resource
+def build_faiss_index(chunks):
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
+    index = faiss.IndexFlatL2(embeddings.shape[1])
+    index.add(embeddings)
+    return index, model, embeddings
+
+
 
 
 
@@ -437,10 +519,12 @@ if not uploaded_files:
     st.info("Please upload one or more PDF rulebooks to continue.")
     st.stop()
 
+st.caption(f"Selected files: {len(uploaded_files)}")
+
 # ---------------------------
 # Process PDFs button
 # ---------------------------
-if st.button("⚙️ Process PDFs"):
+if st.button("⚙️ Process PDFs", disabled=st.session_state.processing_pdfs):
     current_files = [f.name for f in uploaded_files]
     if current_files != st.session_state.last_uploaded_files:
         st.session_state.messages = []
@@ -449,54 +533,43 @@ if st.button("⚙️ Process PDFs"):
         st.session_state.last_uploaded_files = current_files
         # st.toast("🔄 New PDF(s) detected — cache and chat history cleared.", icon="🔁")
 
-    @st.cache_data
-    def extract_pdf_texts(file_data):
-        pdf_texts = []
-        for file_name, file_content in file_data:
-            reader = PdfReader(BytesIO(file_content))
-            text = "\n".join(page.extract_text() or "" for page in reader.pages)
-            pdf_texts.append((file_name, text))
-        return pdf_texts
+    st.session_state.processing_pdfs = True
 
-    file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
-    pdf_texts = extract_pdf_texts(file_data)
+    status_box = st.status("Processing PDFs...", expanded=True)
+    try:
+        status_box.write("Reading and extracting text from uploaded PDFs...")
+        file_data = tuple((f.name, f.getvalue()) for f in uploaded_files)
+        pdf_texts = extract_pdf_texts(file_data)
 
-    def chunk_text(text, chunk_size=2000, overlap=400):   # from 1200 - 200
-        chunks = []
-        start = 0
-        while start < len(text):
-            end = min(start + chunk_size, len(text))
-            chunks.append(text[start:end])
-            start += chunk_size - overlap
-        return chunks
+        status_box.write("Splitting rulebook content into retrievable chunks...")
+        all_chunks = []
+        for _name, text in pdf_texts:
+            chunks = chunk_text(text)
+            all_chunks.extend(chunks)
 
-    all_chunks = []
-    for name, text in pdf_texts:
-        chunks = chunk_text(text)
-        all_chunks.extend(chunks)
+        status_box.write("Building embeddings and FAISS index...")
+        index, model, embeddings = build_faiss_index(all_chunks)
 
-    @st.cache_resource
-    def build_faiss_index(chunks):
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
-        index = faiss.IndexFlatL2(embeddings.shape[1])
-        index.add(embeddings)
-        return index, model, embeddings
+        st.session_state.index = index
+        st.session_state.model = model
+        st.session_state.embeddings = embeddings
+        st.session_state.all_chunks = all_chunks
+        st.session_state.pdfs_processed = True
+        st.session_state.index_ready = True
 
-    index, model, embeddings = build_faiss_index(all_chunks)
+        # ✅ Store messages only (don't display yet)
+        st.session_state.pdf_messages = [
+            f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
+            f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
+        ]
 
-    st.session_state.index = index
-    st.session_state.model = model
-    st.session_state.embeddings = embeddings
-    st.session_state.all_chunks = all_chunks
-    st.session_state.pdfs_processed = True
-    st.session_state.index_ready = True
-
-    # ✅ Store messages only (don't display yet)
-    st.session_state.pdf_messages = [
-        f"✅ Loaded {len(pdf_texts)} PDF(s) successfully",
-        f"✅ Indexed {len(all_chunks)} text chunks for retrieval"
-    ]
+        status_box.update(label="PDF processing complete", state="complete", expanded=False)
+    except Exception as e:
+        st.session_state.pdfs_processed = False
+        status_box.update(label="PDF processing failed", state="error", expanded=True)
+        st.error(f"Failed while processing PDFs: {e}")
+    finally:
+        st.session_state.processing_pdfs = False
 
 
 # ---------------------------
@@ -518,60 +591,9 @@ if "pdf_messages" in st.session_state:
 st.markdown("<hr style='border:2px solid cyan; margin-top:30px; margin-bottom:30px;'>", unsafe_allow_html=True)
 st.markdown("<h3 style='color:#00FFFF;'>💬 Chat with the Guru</h3>", unsafe_allow_html=True)
 
-
-
-
-# ---------------------------
-# Chat history
-# ---------------------------
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
-
-# ---------------------------
-# Chat input
-# ---------------------------
+# Chat input at the main script level so Streamlit keeps it sticky at the bottom.
 query = st.chat_input("Ask a question about the rules:")
-
 if query:
     st.session_state.messages.append({"role": "user", "content": query})
-    with st.chat_message("user"):
-        st.write(query)
 
-    # ---- RAG retrieval ----
-    query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
-    top_k = 6
-    distances, indices = st.session_state.index.search(query_vec, top_k)
-    retrieved_chunks = [st.session_state.all_chunks[i] for i in indices[0]]
-    retrieved_text = "\n\n".join(retrieved_chunks)
-
-    # ---- Prompt construction ----
-    recent_history = "\n".join(
-        [f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.messages[-3:]]
-    )
-
-    prompt = f"""
-    You are a board game rules expert.
-
-    Here are the most relevant excerpts from the rulebook:
-
-    {retrieved_text}
-
-    Recent conversation (for reference only — ignore if unrelated):
-    {recent_history}
-
-    User's question: {query}
-
-    Answer clearly and concisely, using only information from the rulebook.
-    Please keep your answer under 1200 tokens.
-    If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
-    """
-
-
-    # ---- Generate answer ----
-    with st.chat_message("assistant"):
-        with st.spinner("Meditating..."):
-            answer = groq_generate(prompt, max_tokens=3000, temperature=0.3)
-            st.write(answer)
-
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+chat_ui()
