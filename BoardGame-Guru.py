@@ -156,6 +156,42 @@ if "pdfs_processed" not in st.session_state:
 if "processing_pdfs" not in st.session_state:
     st.session_state.processing_pdfs = False
 
+if "llm_provider" not in st.session_state:
+    st.session_state.llm_provider = "Groq"
+
+# ---------------------------
+# LLM provider setup
+# ---------------------------
+groq_cfg = st.secrets.get("groq", {})
+openai_cfg = st.secrets.get("openai", {})
+gemini_cfg = st.secrets.get("gemini", {})
+
+GROQ_API_KEY = groq_cfg.get("api_key") or os.getenv("GROQ_API_KEY", "")
+GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
+GROQ_MODEL = groq_cfg.get("model") or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+OPENAI_API_KEY = openai_cfg.get("api_key") or os.getenv("OPENAI_API_KEY", "")
+OPENAI_API_URL = "https://api.openai.com/v1/responses"
+OPENAI_MODEL = openai_cfg.get("model") or os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+
+GEMINI_API_KEY = gemini_cfg.get("api_key") or os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/"
+GEMINI_MODEL = gemini_cfg.get("model") or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+AVAILABLE_PROVIDERS = []
+if GROQ_API_KEY:
+    AVAILABLE_PROVIDERS.append("Groq")
+if OPENAI_API_KEY:
+    AVAILABLE_PROVIDERS.append("OpenAI")
+if GEMINI_API_KEY:
+    AVAILABLE_PROVIDERS.append("Gemini")
+
+if not AVAILABLE_PROVIDERS:
+    AVAILABLE_PROVIDERS = ["Groq"]
+
+if st.session_state.llm_provider not in AVAILABLE_PROVIDERS:
+    st.session_state.llm_provider = AVAILABLE_PROVIDERS[0]
+
 # ---------------------------
 # App header
 # ---------------------------
@@ -190,6 +226,9 @@ with st.sidebar:
         st.markdown(f"<h3 style='color:#FFB703; font-size:20px; margin-bottom: 2px !important; font-family:Comic Sans MS;'>{st.session_state.game_name}</h3>", 
                     unsafe_allow_html=True)
     st.markdown("---")
+    st.selectbox("Model Provider", AVAILABLE_PROVIDERS, key="llm_provider")
+    if len(AVAILABLE_PROVIDERS) == 1:
+        st.caption(f"Only {AVAILABLE_PROVIDERS[0]} is configured in this deployment.")
     if st.button("🧹 Reset Chat", key="reset"):
         st.session_state.messages = []
         st.session_state.last_uploaded_files = []
@@ -350,22 +389,29 @@ with st.sidebar:
 print("Working directory:", Path.cwd())
 
 
+def _extract_response_text(result):
+    if "output_text" in result and result["output_text"]:
+        return result["output_text"].strip()
 
-# ---------------------------
-# Groq API setup
-# ---------------------------
-GROQ_API_KEY = st.secrets["groq"]["api_key"]
-os.environ["GROQ_API_KEY"] = GROQ_API_KEY
-GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
-GROQ_MODEL = "openai/gpt-oss-120b"
+    if "choices" in result:
+        for choice in result["choices"]:
+            content = choice.get("message", {}).get("content")
+            if content:
+                return content.strip()
 
+    if "output" in result and len(result["output"]) > 0:
+        for item in result["output"]:
+            if "content" in item:
+                for c in item["content"]:
+                    if c.get("type") == "output_text" and c.get("text"):
+                        return c["text"].strip()
 
-def _truncate_text(text, max_chars):
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars].rsplit(" ", 1)[0] + "..."
+    return None
 
 def groq_generate(prompt, max_tokens=250, temperature=0):
+    if not GROQ_API_KEY:
+        return "❌ Groq API key is missing. Add groq.api_key in Streamlit secrets or set GROQ_API_KEY."
+
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -416,22 +462,9 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
         save_daily_tokens(current_tokens)
 
 
-        # Attempt to parse output from several possible response structures
-        if "output_text" in result and result["output_text"]:
-            return result["output_text"].strip()
-
-        if "choices" in result:
-            for choice in result["choices"]:
-                content = choice.get("message", {}).get("content")
-                if content:
-                    return content.strip()
-
-        if "output" in result and len(result["output"]) > 0:
-            for item in result["output"]:
-                if "content" in item:
-                    for c in item["content"]:
-                        if c.get("type") == "output_text" and c.get("text"):
-                            return c["text"].strip()
+        parsed_text = _extract_response_text(result)
+        if parsed_text:
+            return parsed_text
 
         return "⚠️ Unexpected response format from Groq. Please try again."
 
@@ -439,35 +472,126 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
         return f"❌ Network error while contacting Groq API: {e}"
 
 
+def openai_generate(prompt, max_tokens=250, temperature=0):
+    if not OPENAI_API_KEY:
+        return "❌ OpenAI API key is missing. Add openai.api_key in Streamlit secrets or set OPENAI_API_KEY."
+
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": OPENAI_MODEL,
+        "input": prompt,
+        "max_output_tokens": max_tokens,
+        "temperature": temperature
+    }
+
+    try:
+        response = requests.post(OPENAI_API_URL, headers=headers, data=json.dumps(payload))
+
+        if response.status_code == 429:
+            return "⚠️ OpenAI rate limit reached. Please try again shortly."
+
+        if response.status_code in (400, 413):
+            return (
+                "⚠️ The request is too large for the selected OpenAI model. "
+                "Try a shorter question or process fewer PDFs."
+            )
+
+        if response.status_code != 200:
+            return f"❌ API Error ({response.status_code}): {response.text}"
+
+        result = response.json()
+        parsed_text = _extract_response_text(result)
+        if parsed_text:
+            return parsed_text
+
+        return "⚠️ Unexpected response format from OpenAI. Please try again."
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error while contacting OpenAI API: {e}"
+
+
+def _extract_gemini_response_text(result):
+    candidates = result.get("candidates", [])
+    for candidate in candidates:
+        parts = candidate.get("content", {}).get("parts", [])
+        text_parts = [part.get("text", "") for part in parts if part.get("text")]
+        if text_parts:
+            return "\n".join(text_parts).strip()
+    return None
+
+
+def gemini_generate(prompt, max_tokens=250, temperature=0):
+    if not GEMINI_API_KEY:
+        return "❌ Gemini API key is missing. Add gemini.api_key in Streamlit secrets or set GEMINI_API_KEY."
+
+    url = f"{GEMINI_API_URL}{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            "maxOutputTokens": max_tokens,
+        },
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=90)
+
+        if response.status_code == 429:
+            return "⚠️ Gemini rate limit reached. Please try again shortly."
+
+        if response.status_code in (400, 413):
+            return (
+                "⚠️ The request is too large for the selected Gemini model. "
+                "Try a shorter question or process fewer PDFs."
+            )
+
+        if response.status_code != 200:
+            return f"❌ API Error ({response.status_code}): {response.text}"
+
+        result = response.json()
+        parsed_text = _extract_gemini_response_text(result)
+        if parsed_text:
+            return parsed_text
+
+        return "⚠️ Unexpected response format from Gemini. Please try again."
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error while contacting Gemini API: {e}"
+
+
+def llm_generate(prompt, max_tokens=250, temperature=0):
+    if st.session_state.llm_provider == "OpenAI":
+        return openai_generate(prompt, max_tokens=max_tokens, temperature=temperature)
+    if st.session_state.llm_provider == "Gemini":
+        return gemini_generate(prompt, max_tokens=max_tokens, temperature=temperature)
+    return groq_generate(prompt, max_tokens=max_tokens, temperature=temperature)
+
+
 def _rag_generate(query):
-    """Run RAG retrieval and build an answer via Groq."""
+    """Run RAG retrieval and build an answer via selected provider."""
     query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
-    top_k = 4
+    top_k = 10
     distances, idxs = st.session_state.index.search(query_vec, top_k)
     retrieved_chunks = [st.session_state.all_chunks[i] for i in idxs[0]]
-    retrieved_text = _truncate_text("\n\n".join(retrieved_chunks), 7000)
-
-    recent_history = _truncate_text("\n".join(
-        [f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.messages[-3:]]
-    ), 1200)
+    retrieved_text = "\n\n".join(retrieved_chunks)
 
     prompt = f"""
-    You are a board game rules expert.
+You are a board game rules expert.
 
-    Here are the most relevant excerpts from the rulebook:
+Here are the most relevant excerpts from the rulebook:
 
-    {retrieved_text}
+{retrieved_text}
 
-    Recent conversation (for reference only — ignore if unrelated):
-    {recent_history}
+Question: {query}
 
-    User's question: {query}
-
-    Answer clearly and concisely, using only information from the rulebook.
-    Please keep your answer under 1200 tokens.
-    If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
-    """
-    return groq_generate(prompt, max_tokens=1200, temperature=0.3)
+Answer clearly and concisely, based only on the rulebook.
+If the answer isn't found, say: "That information is not found somewhere in the rulebook."
+"""
+    return llm_generate(prompt, max_tokens=3000, temperature=0.3)
 
 
 @st.fragment
@@ -496,7 +620,7 @@ def extract_pdf_texts(file_data):
     return pdf_texts
 
 
-def chunk_text(text, chunk_size=2000, overlap=400):   # from 1200 - 200
+def chunk_text(text, chunk_size=1200, overlap=200):
     chunks = []
     start = 0
     while start < len(text):
@@ -602,7 +726,7 @@ if "pdf_messages" in st.session_state:
 # ---------------------------
 st.markdown("<hr style='border:2px solid cyan; margin-top:30px; margin-bottom:30px;'>", unsafe_allow_html=True)
 st.markdown("<h3 style='color:#00FFFF;'>💬 Chat with the Guru</h3>", unsafe_allow_html=True)
-st.caption("Tip: If a question mentions many rules, units, or cards, try asking about one item at a time so the reply stays within the model's token limit.")
+st.caption(f"Active provider: {st.session_state.llm_provider}")
 
 # Chat input at the main script level so Streamlit keeps it sticky at the bottom.
 query = st.chat_input("Ask a question about the rules:")
