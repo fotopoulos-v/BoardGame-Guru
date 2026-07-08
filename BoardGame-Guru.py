@@ -359,6 +359,12 @@ os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 GROQ_API_URL = "https://api.groq.com/openai/v1/responses"
 GROQ_MODEL = "openai/gpt-oss-120b"
 
+
+def _truncate_text(text, max_chars):
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rsplit(" ", 1)[0] + "..."
+
 def groq_generate(prompt, max_tokens=250, temperature=0):
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -379,6 +385,12 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
             return (
                 "⚠️ The model usage limit has been reached. "
                 "Please try again in a few minutes. If the day limit has been reached, try again tomorrow."
+            )
+
+        elif response.status_code == 413:
+            return (
+                "⚠️ This question produced a request that was too large for the model. "
+                "Please try a shorter question or upload a smaller set of PDFs."
             )
 
         elif response.status_code == 400:
@@ -430,14 +442,14 @@ def groq_generate(prompt, max_tokens=250, temperature=0):
 def _rag_generate(query):
     """Run RAG retrieval and build an answer via Groq."""
     query_vec = st.session_state.model.encode([query], convert_to_numpy=True)
-    top_k = 6
+    top_k = 4
     distances, idxs = st.session_state.index.search(query_vec, top_k)
     retrieved_chunks = [st.session_state.all_chunks[i] for i in idxs[0]]
-    retrieved_text = "\n\n".join(retrieved_chunks)
+    retrieved_text = _truncate_text("\n\n".join(retrieved_chunks), 7000)
 
-    recent_history = "\n".join(
+    recent_history = _truncate_text("\n".join(
         [f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.messages[-3:]]
-    )
+    ), 1200)
 
     prompt = f"""
     You are a board game rules expert.
@@ -455,7 +467,7 @@ def _rag_generate(query):
     Please keep your answer under 1200 tokens.
     If the answer isn't found in the rulebook, reply: "That information cannot be found in the provided PDFs."
     """
-    return groq_generate(prompt, max_tokens=3000, temperature=0.3)
+    return groq_generate(prompt, max_tokens=1200, temperature=0.3)
 
 
 @st.fragment
@@ -590,6 +602,7 @@ if "pdf_messages" in st.session_state:
 # ---------------------------
 st.markdown("<hr style='border:2px solid cyan; margin-top:30px; margin-bottom:30px;'>", unsafe_allow_html=True)
 st.markdown("<h3 style='color:#00FFFF;'>💬 Chat with the Guru</h3>", unsafe_allow_html=True)
+st.caption("Tip: If a question mentions many rules, units, or cards, try asking about one item at a time so the reply stays within the model's token limit.")
 
 # Chat input at the main script level so Streamlit keeps it sticky at the bottom.
 query = st.chat_input("Ask a question about the rules:")
